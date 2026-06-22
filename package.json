@@ -1,0 +1,26 @@
+{
+  "name": "social-media-knowledge-base",
+  "version": "1.0.0",
+  "description": "Auto-crawl Douyin likes/favorites, transcribe, summarize, and store in local knowledge base",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "crawl": "ts-node src/index.ts --once"
+  },
+  "dependencies": {
+    "@anthropic-ai/bedrock-sdk": "^0.12.6",
+    "axios": "^1.7.0",
+    "better-sqlite3": "^11.0.0",
+    "node-cron": "^3.0.3",
+    "playwright": "^1.45.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^20.0.0",
+    "@types/node-cron": "^3.0.11",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.0"
+  }
+}

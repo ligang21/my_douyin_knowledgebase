@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:media.youdao.com)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npx playwright *)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)"
+    ]
+  }
+}
