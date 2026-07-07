@@ -14,10 +14,10 @@ export interface VideoItem {
 }
 
 const TABS = [
-  {
-    name: 'like' as const,
-    url: 'https://www.douyin.com/user/self?from_tab_name=main&showSubTab=video&showTab=like',
-  },
+  // {
+  //   name: 'like' as const,
+  //   url: 'https://www.douyin.com/user/self?from_tab_name=main&showSubTab=video&showTab=like',
+  // },
   {
     name: 'favorite' as const,
     url: 'https://www.douyin.com/user/self?from_tab_name=main&showSubTab=video&showTab=favorite_collection',

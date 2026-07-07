@@ -36,7 +36,7 @@ A locally-running automated knowledge base that automatically crawls, transcribe
 └──────────────┬──────────────────────┬───────────────┘
                │                      │
     ┌──────────▼──────────┐ ┌──────────▼──────────────┐
-    │       SQLite         │ │       ChromaDB           │
+    │       SQLite         │ │       LanceDB             │
     │  Structured metadata │ │  Vector index            │
     │  title/url/platform/ │ │  (summary + tags)        │
     │  likes/raw transcript│ │  semantic search         │
@@ -47,7 +47,7 @@ A locally-running automated knowledge base that automatically crawls, transcribe
     │           POST /api/chat receives user query     │
     │           1st Claude call: understand intent     │
     │              → decide which tool to invoke       │
-    │           Execute tool: query SQLite / ChromaDB  │
+    │           Execute tool: query SQLite / LanceDB  │
     │           2nd Claude call: generate final answer │
     │           Stream response via SSE                │
     └──────────────────────┬──────────────────────────┘
@@ -67,7 +67,7 @@ A locally-running automated knowledge base that automatically crawls, transcribe
 | Transcription | Wangyijianwai API |
 | Agent | Anthropic Node.js SDK (Claude) |
 | Metadata store | SQLite (better-sqlite3) |
-| Vector store | ChromaDB (JS client) |
+| Vector store | LanceDB (native Node.js) |
 | Backend | Express.js + TypeScript |
 | Frontend | HTML + CSS + TypeScript (SSE) |
 | Scheduler | node-cron |
@@ -78,7 +78,7 @@ When the user submits a natural language question:
 
 1. Frontend `POST /api/chat`
 2. **1st Claude API call** — Claude reads the question and decides which tool to invoke (semantic search / exact filter / combined)
-3. Execute tool — query SQLite or ChromaDB
+3. Execute tool — query SQLite or LanceDB
 4. **2nd Claude API call** — Claude receives query results and generates the final answer
 5. SSE streams the response back; frontend renders with typewriter effect
 

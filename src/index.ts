@@ -7,6 +7,7 @@ import {
 } from './db';
 import { submitTranscription, queryTask, fetchTranscriptText } from './youdao';
 import { summarizeTranscript } from './summarizer';
+import { upsertVector } from './vectorStore';
 
 const CRON_SCHEDULE = process.env.CRON_SCHEDULE || '0 */6 * * *';
 const POLL_INTERVAL_MS = 60_000; // poll Youdao status every 60s
@@ -111,6 +112,7 @@ async function stepSummarize() {
     try {
       const result = await summarizeTranscript(video.title, video.transcript!);
       setSummary(video.id, result.summary, result.tags, result.keyPoints, result.contentType);
+      await upsertVector(video.id, result.summary, result.tags, video.source_tab, result.contentType);
       console.log(`[claude] Summarized ${video.id}: ${result.tags.join(', ')}`);
     } catch (err) {
       console.error(`[claude] Summarization failed for ${video.id}:`, err);
