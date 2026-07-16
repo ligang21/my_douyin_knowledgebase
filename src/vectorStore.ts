@@ -4,7 +4,7 @@ import { pipeline, FeatureExtractionPipeline } from '@xenova/transformers';
 
 const DB_DIR = process.env.LANCE_PATH || './data/lancedb';
 const TABLE_NAME = 'videos';
-const EMBED_MODEL = 'Xenova/all-MiniLM-L6-v2'; // 384-dim, ~23MB download on first run
+const EMBED_MODEL = 'Xenova/bge-small-zh-v1.5'; // 512-dim, ~95MB download on first run
 
 let _embedder: FeatureExtractionPipeline | null = null;
 let _table: Table | null = null;
@@ -30,7 +30,7 @@ async function getTable(): Promise<Table> {
       {
         id: '__init__',
         text: '',
-        vector: new Array(384).fill(0) as number[],
+        vector: new Array(512).fill(0) as number[],
         source_tab: '',
         content_type: '',
         tags: '',
