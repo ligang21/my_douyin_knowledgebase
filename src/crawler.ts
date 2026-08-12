@@ -2,13 +2,14 @@ import { chromium } from 'playwright';
 import path from 'path';
 import os from 'os';
 
-// Chrome user data dir on Windows — reuses your logged-in session
-const CHROME_USER_DATA = path.join(os.homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'User Data');
+const CHROME_USER_DATA = process.env.CHROME_USER_DATA ||
+  path.join(os.homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'DouyinCrawler');
 
 export interface VideoItem {
   id: string;
   title: string | null;
-  url: string;
+  url: string;       // douyin.com page URL (for display/sharing)
+  cdnUrl?: string;   // CDN direct URL (for Youdao transcription)
   likes: number;
   sourceTab: 'like' | 'favorite';
 }
@@ -27,7 +28,7 @@ const TABS = [
 export async function crawlDouyin(): Promise<VideoItem[]> {
   const browser = await chromium.launchPersistentContext(CHROME_USER_DATA, {
     channel: 'chrome',
-    headless: false,   // must be visible to reuse logged-in session
+    headless: false,
     args: ['--disable-blink-features=AutomationControlled'],
   });
 
@@ -53,11 +54,34 @@ async function crawlTab(
   const page = await context.newPage();
   const items: VideoItem[] = [];
 
+  // Intercept Douyin internal API responses to capture CDN video URLs
+  const cdnUrlMap = new Map<string, string>();
+  page.on('response', async (response) => {
+    const url = response.url();
+    if (!url.includes('/aweme/v1/') && !url.includes('/aweme/detail/')) return;
+    try {
+      const json = await response.json();
+      const list: unknown[] =
+        json?.aweme_list ?? json?.data?.aweme_list ?? [];
+      for (const item of list as Record<string, unknown>[]) {
+        const id = item?.aweme_id;
+        const urlList = (item?.video as Record<string, unknown>)
+          ?.play_addr as Record<string, unknown>;
+        const cdnUrl = (urlList?.url_list as string[])?.[0];
+        if (id && cdnUrl) {
+          cdnUrlMap.set(String(id), cdnUrl);
+        }
+      }
+    } catch {
+      // non-JSON response, skip
+    }
+  });
+
   try {
-    await page.goto(tabUrl, { waitUntil: 'networkidle', timeout: 30_000 });
+    await page.goto(tabUrl, { waitUntil: 'load', timeout: 60_000 });
+    await page.waitForSelector('[data-e2e="user-post-item"], .video-card, li[class*="video"]', { timeout: 15_000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
-    // Scroll down to load more videos (Douyin uses virtual scroll)
     let previousCount = 0;
     let noGrowthRounds = 0;
 
@@ -74,50 +98,44 @@ async function crawlTab(
       }
     }
 
-    // Extract video metadata from the loaded cards
-    const extracted = await page.evaluate((_src) => {
+    const extracted = await page.evaluate(() => {
       const results: Array<{ id: string; title: string | null; url: string; likes: number }> = [];
-
-      // Douyin renders video cards as <li> or <div> with an <a> pointing to /video/{id}
       const anchors = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href*="/video/"]'));
       const seen = new Set<string>();
 
       for (const a of anchors) {
-        const href = a.href;
-        const match = href.match(/\/video\/(\d+)/);
+        const match = a.href.match(/\/video\/(\d+)/);
         if (!match) continue;
-
         const id = match[1];
         if (seen.has(id)) continue;
         seen.add(id);
 
-        // Try to find title text nearby
         const card = a.closest('li') ?? a.closest('div[class*="card"]') ?? a.parentElement;
         const titleEl = card?.querySelector('[class*="title"], [class*="desc"], p');
         const title = titleEl?.textContent?.trim() ?? null;
 
-        // Try to find like count nearby
         const likeEl = card?.querySelector('[class*="like"], [class*="digg"]');
         const likesText = likeEl?.textContent?.replace(/[^0-9.万w]/g, '') ?? '0';
-        const likes = parseChineseLikeCount(likesText);
 
-        results.push({ id, title, url: `https://www.douyin.com/video/${id}`, likes });
+        function parseChineseLikeCount(text: string): number {
+          if (!text) return 0;
+          if (text.includes('万') || text.includes('w')) {
+            return Math.round(parseFloat(text) * 10000);
+          }
+          return parseInt(text, 10) || 0;
+        }
+
+        results.push({ id, title, url: `https://www.douyin.com/video/${id}`, likes: parseChineseLikeCount(likesText) });
       }
 
       return results;
-
-      function parseChineseLikeCount(text: string): number {
-        if (!text) return 0;
-        if (text.includes('万') || text.includes('w')) {
-          return Math.round(parseFloat(text) * 10000);
-        }
-        return parseInt(text, 10) || 0;
-      }
     });
 
     for (const v of extracted) {
-      items.push({ ...v, sourceTab });
+      items.push({ ...v, sourceTab, cdnUrl: cdnUrlMap.get(v.id) });
     }
+
+    console.log(`[crawl] CDN URLs captured: ${cdnUrlMap.size}/${extracted.length}`);
   } finally {
     await page.close();
   }

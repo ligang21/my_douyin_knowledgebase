@@ -18,32 +18,36 @@ async function stepCrawl() {
   console.log('[crawl] Starting Douyin crawl...');
   const videos = await crawlDouyin();
   let newCount = 0;
+  let submitCount = 0;
 
   for (const v of videos) {
-    if (!videoExists(v.id)) {
-      upsertVideo({
-        id: v.id,
-        platform: 'douyin',
-        source_tab: v.sourceTab,
-        title: v.title,
-        url: v.url,
-        likes: v.likes,
-      });
-      newCount++;
-    } else {
-      // Always update likes count
-      upsertVideo({
-        id: v.id,
-        platform: 'douyin',
-        source_tab: v.sourceTab,
-        title: v.title,
-        url: v.url,
-        likes: v.likes,
-      });
+    const isNew = !videoExists(v.id);
+    upsertVideo({
+      id: v.id,
+      platform: 'douyin',
+      source_tab: v.sourceTab,
+      title: v.title,
+      url: v.url,
+      likes: v.likes,
+    });
+    if (isNew) newCount++;
+
+    // Submit to Youdao immediately while CDN URL is fresh (they expire)
+    if (isNew && v.cdnUrl) {
+      try {
+        const mediaId = await submitTranscription(v.cdnUrl);
+        setYoudaoJob(v.id, mediaId);
+        console.log(`[youdao] Submitted ${v.id} → mediaId: ${mediaId}`);
+        submitCount++;
+      } catch (err) {
+        console.error(`[youdao] Failed to submit ${v.id}:`, err);
+        setYoudaoFailed(v.id);
+      }
+      await sleep(500);
     }
   }
 
-  console.log(`[crawl] Done. ${videos.length} total, ${newCount} new.`);
+  console.log(`[crawl] Done. ${videos.length} total, ${newCount} new, ${submitCount} submitted to Youdao.`);
 }
 
 // ─── Step 2: Submit pending videos to Youdao ─────────────────────────────────
